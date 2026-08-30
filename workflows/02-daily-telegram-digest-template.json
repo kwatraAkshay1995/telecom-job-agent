@@ -1,0 +1,8 @@
+{
+  "name": "Telecom Job Agent - Daily Digest TEMPLATE",
+  "nodes": [],
+  "connections": {},
+  "settings": {},
+  "active": false,
+  "notes": "Template placeholder. Add after V0 scoring is validated: Schedule Trigger -> Google Sheets read -> top jobs filter -> Telegram send. Kept out of V0 deliberately so Telegram/Google OAuth setup does not block scoring validation."
+}
