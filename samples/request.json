@@ -1,0 +1,37 @@
+{
+  "candidate_profile": {
+    "current_role": "Telecom Network Engineer",
+    "years_experience": 6,
+    "skills": ["LTE", "5G", "RAN", "RF Optimization", "Ericsson"],
+    "preferred_locations": ["Bangalore", "Gurgaon", "Noida"],
+    "preferred_roles": ["RAN Engineer", "RF Optimization Engineer", "5G Network Engineer"],
+    "avoid_roles": ["L1 Support", "Field Technician", "Project Manager"]
+  },
+  "positive_examples": [
+    {
+      "title": "RAN Optimization Engineer",
+      "reason": "Strong 4G/5G optimization and KPI analysis work"
+    },
+    {
+      "title": "5G Performance Engineer",
+      "reason": "Hands-on network performance and optimization"
+    }
+  ],
+  "negative_examples": [
+    {
+      "title": "Network Support Engineer",
+      "reason": "Mostly L1/L2 tickets and operational support"
+    },
+    {
+      "title": "Telecom Field Technician",
+      "reason": "Field-installation heavy and too junior"
+    }
+  ],
+  "job": {
+    "title": "Senior RAN Optimization Engineer",
+    "company": "Example Telecom",
+    "location": "Gurgaon",
+    "description": "Responsible for LTE and 5G RAN optimization, KPI analysis, Ericsson OSS performance monitoring, drive test analysis, root-cause analysis and optimization recommendations. Requires 5+ years of telecom network experience.",
+    "url": "https://example.com/jobs/123"
+  }
+}
