@@ -10,6 +10,7 @@ services:
       - N8N_PROTOCOL=${N8N_PROTOCOL:-http}
       - GENERIC_TIMEZONE=${GENERIC_TIMEZONE:-Asia/Kolkata}
       - TZ=${TZ:-Asia/Kolkata}
+      - N8N_BLOCK_ENV_ACCESS_IN_NODE=${N8N_BLOCK_ENV_ACCESS_IN_NODE:-false}
       - GEMINI_API_KEY=${GEMINI_API_KEY}
       - GEMINI_MODEL=${GEMINI_MODEL:-gemini-2.5-flash-lite}
     volumes:
