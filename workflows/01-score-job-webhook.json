@@ -17,7 +17,7 @@
     },
     {
       "parameters": {
-        "jsCode": "const body = $json.body ?? $json;\n\nfor (const required of ['candidate_profile', 'job']) {\n  if (!body[required]) throw new Error(`Missing required field: ${required}`);\n}\n\nconst profile = body.candidate_profile;\nconst positive = body.positive_examples ?? [];\nconst negative = body.negative_examples ?? [];\nconst job = body.job;\n\nconst prompt = `You are a career matching engine for one candidate.\n\nSCORING PRIORITY\n1. Explicit negative examples and avoid preferences.\n2. Explicit positive examples and preferred roles.\n3. Candidate skills and experience.\n4. Location and seniority fit.\n5. Transferable skills.\n\nDo not inflate a score merely because a job is in telecom.\n\nScore meaning:\n90-100 exceptional fit\n80-89 strong fit\n70-79 reasonable fit\n55-69 borderline\nbelow 55 poor fit\n\nCandidate profile:\n${JSON.stringify(profile, null, 2)}\n\nJobs the candidate likes:\n${JSON.stringify(positive, null, 2)}\n\nJobs the candidate dislikes:\n${JSON.stringify(negative, null, 2)}\n\nJob to evaluate:\n${JSON.stringify(job, null, 2)}\n\nReturn JSON only with keys: score (integer 0-100), verdict (EXCELLENT|STRONG|POSSIBLE|WEAK|REJECT), matching_reasons (array max 5), gaps (array), red_flags (array), inferred_role_family (string), recommended_action (APPLY|REVIEW|SKIP).`;\n\nconst request = {\n  model: body.model || 'gpt-5.6-luna',\n  input: prompt,\n  text: {\n    format: {\n      type: 'json_schema',\n      name: 'job_match',\n      strict: true,\n      schema: {\n        type: 'object',\n        additionalProperties: false,\n        properties: {\n          score: { type: 'integer', minimum: 0, maximum: 100 },\n          verdict: { type: 'string', enum: ['EXCELLENT','STRONG','POSSIBLE','WEAK','REJECT'] },\n          matching_reasons: { type: 'array', items: { type: 'string' }, maxItems: 5 },\n          gaps: { type: 'array', items: { type: 'string' } },\n          red_flags: { type: 'array', items: { type: 'string' } },\n          inferred_role_family: { type: 'string' },\n          recommended_action: { type: 'string', enum: ['APPLY','REVIEW','SKIP'] }\n        },\n        required: ['score','verdict','matching_reasons','gaps','red_flags','inferred_role_family','recommended_action']\n      }\n    }\n  }\n};\n\nreturn [{ json: { request, source_job: job } }];"
+        "jsCode": "const body = $json.body ?? $json;\n\nfor (const required of ['candidate_profile', 'job']) {\n  if (!body[required]) throw new Error(`Missing required field: ${required}`);\n}\n\nconst profile = body.candidate_profile;\nconst positive = body.positive_examples ?? [];\nconst negative = body.negative_examples ?? [];\nconst job = body.job;\n\nconst prompt = `You are a career matching engine for one candidate.\n\nSCORING PRIORITY\n1. Explicit negative examples and avoid preferences.\n2. Explicit positive examples and preferred roles.\n3. Candidate skills and experience.\n4. Location and seniority fit.\n5. Transferable skills.\n\nDo not inflate a score merely because a job is in telecom.\n\nScore meaning:\n90-100 exceptional fit\n80-89 strong fit\n70-79 reasonable fit\n55-69 borderline\nbelow 55 poor fit\n\nCandidate profile:\n${JSON.stringify(profile, null, 2)}\n\nJobs the candidate likes:\n${JSON.stringify(positive, null, 2)}\n\nJobs the candidate dislikes:\n${JSON.stringify(negative, null, 2)}\n\nJob to evaluate:\n${JSON.stringify(job, null, 2)}\n\nEvaluate the job and call the record_job_match tool exactly once with the final result.`;\n\nconst schema = {\n  type: 'object',\n  additionalProperties: false,\n  properties: {\n    score: { type: 'integer', minimum: 0, maximum: 100 },\n    verdict: { type: 'string', enum: ['EXCELLENT','STRONG','POSSIBLE','WEAK','REJECT'] },\n    matching_reasons: { type: 'array', items: { type: 'string' }, maxItems: 5 },\n    gaps: { type: 'array', items: { type: 'string' } },\n    red_flags: { type: 'array', items: { type: 'string' } },\n    inferred_role_family: { type: 'string' },\n    recommended_action: { type: 'string', enum: ['APPLY','REVIEW','SKIP'] }\n  },\n  required: ['score','verdict','matching_reasons','gaps','red_flags','inferred_role_family','recommended_action']\n};\n\nconst request = {\n  model: body.model || 'claude-haiku-4-5',\n  max_tokens: 1200,\n  messages: [{ role: 'user', content: prompt }],\n  tools: [{\n    name: 'record_job_match',\n    description: 'Return the final structured assessment of how well this job matches the candidate.',\n    input_schema: schema\n  }],\n  tool_choice: { type: 'tool', name: 'record_job_match' }\n};\n\nreturn [{ json: { request, source_job: job } }];"
       },
       "id": "f5ea8704-273a-4110-9d70-2dca576fdd5f",
       "name": "Build Scoring Request",
@@ -28,29 +28,30 @@
     {
       "parameters": {
         "method": "POST",
-        "url": "https://api.openai.com/v1/responses",
+        "url": "https://api.anthropic.com/v1/messages",
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
-            {"name": "Authorization", "value": "=Bearer {{$env.OPENAI_API_KEY}}"},
+            {"name": "x-api-key", "value": "={{$env.ANTHROPIC_API_KEY}}"},
+            {"name": "anthropic-version", "value": "2023-06-01"},
             {"name": "Content-Type", "value": "application/json"}
           ]
         },
         "sendBody": true,
         "contentType": "raw",
         "rawContentType": "application/json",
-        "body": "={{ JSON.stringify($json.request) }}",
+        "body": "={{ JSON.stringify({ ...$json.request, model: $env.ANTHROPIC_MODEL || $json.request.model }) }}",
         "options": {}
       },
       "id": "3fe2cdf9-c494-48d5-bce0-74a89de8fe66",
-      "name": "OpenAI Score Job",
+      "name": "Claude Haiku Score Job",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
       "position": [520, 0]
     },
     {
       "parameters": {
-        "jsCode": "const r = $json;\nlet text = r.output_text;\nif (!text && Array.isArray(r.output)) {\n  for (const item of r.output) {\n    for (const content of (item.content ?? [])) {\n      if (content.type === 'output_text' && content.text) { text = content.text; break; }\n    }\n    if (text) break;\n  }\n}\nif (!text) throw new Error('OpenAI response did not contain output text');\nconst result = JSON.parse(text);\nreturn [{ json: { ...result, scored_at: new Date().toISOString() } }];"
+        "jsCode": "const r = $json;\nconst toolUse = (r.content ?? []).find(item => item.type === 'tool_use' && item.name === 'record_job_match');\nif (!toolUse?.input) throw new Error('Anthropic response did not contain record_job_match tool output');\nreturn [{ json: { ...toolUse.input, scored_at: new Date().toISOString(), model: r.model, usage: r.usage ?? {} } }];"
       },
       "id": "f8250d24-03f9-4eb8-897a-345224ef7f33",
       "name": "Parse Score",
@@ -61,13 +62,13 @@
   ],
   "connections": {
     "Score Job Webhook": {"main": [[{"node": "Build Scoring Request", "type": "main", "index": 0}]]},
-    "Build Scoring Request": {"main": [[{"node": "OpenAI Score Job", "type": "main", "index": 0}]]},
-    "OpenAI Score Job": {"main": [[{"node": "Parse Score", "type": "main", "index": 0}]]}
+    "Build Scoring Request": {"main": [[{"node": "Claude Haiku Score Job", "type": "main", "index": 0}]]},
+    "Claude Haiku Score Job": {"main": [[{"node": "Parse Score", "type": "main", "index": 0}]]}
   },
   "pinData": {},
   "settings": {"executionOrder": "v1"},
   "active": false,
-  "versionId": "6c6f33c0-1e59-4d04-9af3-3562016e0604",
+  "versionId": "aa54a7a8-9a40-4e2e-a019-f04d6b46cb4b",
   "meta": {"templateCredsSetupCompleted": false},
   "tags": []
 }
