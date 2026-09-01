@@ -27,7 +27,7 @@ Resume/profile + preferences
        n8n workflow
             |
             v
- Anthropic Claude Haiku API
+ Google Gemini API
             |
             v
  score + explanation + verdict
@@ -40,9 +40,13 @@ Resume/profile + preferences
 
 ## Model
 
-V0 defaults to `claude-haiku-4-5` through the Anthropic Messages API. The workflow forces Claude to return the assessment through a structured tool schema so the downstream n8n nodes receive predictable JSON.
+V0 defaults to `gemini-2.5-flash-lite` through the Gemini Developer API. It is a stable, fast model that supports structured JSON output and currently has free input/output token usage on Google's free developer tier.
 
-The model is configurable with `ANTHROPIC_MODEL` in `.env`.
+The workflow sends a JSON schema with every scoring request, so downstream n8n nodes receive a predictable object rather than free-form model text.
+
+The model is configurable with `GEMINI_MODEL` in `.env`.
+
+> Privacy note: Google's Gemini Developer API free tier may use submitted content to improve Google products. V0 therefore uses synthetic candidate data only. Before processing a real CV/profile, review the current data-use terms and decide whether to move the project to a paid tier or another provider.
 
 ## Quick start
 
@@ -56,19 +60,19 @@ docker compose up -d
 
 Open http://localhost:5678 and create the local n8n owner account.
 
-### 2. Configure environment
+### 2. Create a Gemini API key
 
-Copy `.env.example` to `.env` and add your Anthropic API key.
+Create an API key in Google AI Studio / Gemini Developer API, then copy `.env.example` to `.env`:
 
 ```bash
 cp .env.example .env
 ```
 
-Then edit `.env`:
+Edit `.env`:
 
 ```text
-ANTHROPIC_API_KEY=your_real_key_here
-ANTHROPIC_MODEL=claude-haiku-4-5
+GEMINI_API_KEY=your_real_key_here
+GEMINI_MODEL=gemini-2.5-flash-lite
 ```
 
 `.env` is gitignored. Never put the real API key in `.env.example`, workflow JSON, README, or GitHub.
@@ -125,7 +129,7 @@ POST JSON like this to the webhook:
 }
 ```
 
-The response is structured JSON containing the match score, verdict, reasons, gaps, red flags, model name, and Anthropic token usage.
+The response is structured JSON containing the match score, verdict, reasons, gaps, red flags, model version, and Gemini usage metadata.
 
 You can also test with the included sample:
 
@@ -135,19 +139,17 @@ curl -X POST 'YOUR_N8N_WEBHOOK_URL' \
   --data @samples/request.json
 ```
 
-## About free model APIs
+## Why Gemini for V0
 
-The workflow currently uses Anthropic because it is already configured for the project and is inexpensive at this scale. The architecture can later be adapted to Gemini or an Anthropic/OpenAI-compatible gateway without changing the candidate/job data model.
+For this one-person prototype, Gemini 2.5 Flash-Lite keeps model inference cost at zero while we validate whether the ranking logic is actually useful. The candidate/job data model is provider-independent, so switching models later does not require redesigning the application.
 
-For real CV/profile data, review each provider's data-use policy before switching to a free tier. Free developer tiers can have different privacy terms from paid API usage.
+Do not commit real job inputs, personal profile data, or any future real resume to this repository; submit them to the running workflow at runtime.
 
 ## Suggested V0 validation
 
-Before automating job discovery, give the workflow 20–30 real job descriptions your friend has never rated. Ask him to rate the top 10 independently.
+Before automating job discovery, give the workflow 20–30 job descriptions the candidate has never rated. Ask him to rate the top 10 independently.
 
 A good signal to continue is if roughly 8 of the agent's top 10 are jobs he genuinely considers relevant.
-
-Do not commit those job inputs or any future real resume to this repository; submit them to the running workflow at runtime.
 
 ## Next milestones
 

@@ -17,7 +17,7 @@
     },
     {
       "parameters": {
-        "jsCode": "const body = $json.body ?? $json;\n\nfor (const required of ['candidate_profile', 'job']) {\n  if (!body[required]) throw new Error(`Missing required field: ${required}`);\n}\n\nconst profile = body.candidate_profile;\nconst positive = body.positive_examples ?? [];\nconst negative = body.negative_examples ?? [];\nconst job = body.job;\n\nconst prompt = `You are a career matching engine for one candidate.\n\nSCORING PRIORITY\n1. Explicit negative examples and avoid preferences.\n2. Explicit positive examples and preferred roles.\n3. Candidate skills and experience.\n4. Location and seniority fit.\n5. Transferable skills.\n\nDo not inflate a score merely because a job is in telecom.\n\nScore meaning:\n90-100 exceptional fit\n80-89 strong fit\n70-79 reasonable fit\n55-69 borderline\nbelow 55 poor fit\n\nCandidate profile:\n${JSON.stringify(profile, null, 2)}\n\nJobs the candidate likes:\n${JSON.stringify(positive, null, 2)}\n\nJobs the candidate dislikes:\n${JSON.stringify(negative, null, 2)}\n\nJob to evaluate:\n${JSON.stringify(job, null, 2)}\n\nEvaluate the job and call the record_job_match tool exactly once with the final result.`;\n\nconst schema = {\n  type: 'object',\n  additionalProperties: false,\n  properties: {\n    score: { type: 'integer', minimum: 0, maximum: 100 },\n    verdict: { type: 'string', enum: ['EXCELLENT','STRONG','POSSIBLE','WEAK','REJECT'] },\n    matching_reasons: { type: 'array', items: { type: 'string' }, maxItems: 5 },\n    gaps: { type: 'array', items: { type: 'string' } },\n    red_flags: { type: 'array', items: { type: 'string' } },\n    inferred_role_family: { type: 'string' },\n    recommended_action: { type: 'string', enum: ['APPLY','REVIEW','SKIP'] }\n  },\n  required: ['score','verdict','matching_reasons','gaps','red_flags','inferred_role_family','recommended_action']\n};\n\nconst request = {\n  model: body.model || 'claude-haiku-4-5',\n  max_tokens: 1200,\n  messages: [{ role: 'user', content: prompt }],\n  tools: [{\n    name: 'record_job_match',\n    description: 'Return the final structured assessment of how well this job matches the candidate.',\n    input_schema: schema\n  }],\n  tool_choice: { type: 'tool', name: 'record_job_match' }\n};\n\nreturn [{ json: { request, source_job: job } }];"
+        "jsCode": "const body = $json.body ?? $json;\n\nfor (const required of ['candidate_profile', 'job']) {\n  if (!body[required]) throw new Error(`Missing required field: ${required}`);\n}\n\nconst profile = body.candidate_profile;\nconst positive = body.positive_examples ?? [];\nconst negative = body.negative_examples ?? [];\nconst job = body.job;\n\nconst prompt = `You are a career matching engine for one candidate.\n\nSCORING PRIORITY\n1. Explicit negative examples and avoid preferences.\n2. Explicit positive examples and preferred roles.\n3. Candidate skills and experience.\n4. Location and seniority fit.\n5. Transferable skills.\n\nDo not inflate a score merely because a job is in telecom.\n\nScore meaning:\n90-100 exceptional fit\n80-89 strong fit\n70-79 reasonable fit\n55-69 borderline\nbelow 55 poor fit\n\nCandidate profile:\n${JSON.stringify(profile, null, 2)}\n\nJobs the candidate likes:\n${JSON.stringify(positive, null, 2)}\n\nJobs the candidate dislikes:\n${JSON.stringify(negative, null, 2)}\n\nJob to evaluate:\n${JSON.stringify(job, null, 2)}\n\nReturn only the structured assessment requested by the response schema.`;\n\nconst schema = {\n  type: 'object',\n  additionalProperties: false,\n  properties: {\n    score: { type: 'integer', minimum: 0, maximum: 100 },\n    verdict: { type: 'string', enum: ['EXCELLENT','STRONG','POSSIBLE','WEAK','REJECT'] },\n    matching_reasons: { type: 'array', items: { type: 'string' }, maxItems: 5 },\n    gaps: { type: 'array', items: { type: 'string' } },\n    red_flags: { type: 'array', items: { type: 'string' } },\n    inferred_role_family: { type: 'string' },\n    recommended_action: { type: 'string', enum: ['APPLY','REVIEW','SKIP'] }\n  },\n  required: ['score','verdict','matching_reasons','gaps','red_flags','inferred_role_family','recommended_action']\n};\n\nconst request = {\n  contents: [{\n    role: 'user',\n    parts: [{ text: prompt }]\n  }],\n  generationConfig: {\n    temperature: 0.2,\n    maxOutputTokens: 1200,\n    responseMimeType: 'application/json',\n    responseSchema: schema\n  }\n};\n\nreturn [{ json: { request, source_job: job } }];"
       },
       "id": "f5ea8704-273a-4110-9d70-2dca576fdd5f",
       "name": "Build Scoring Request",
@@ -28,30 +28,29 @@
     {
       "parameters": {
         "method": "POST",
-        "url": "https://api.anthropic.com/v1/messages",
+        "url": "={{ 'https://generativelanguage.googleapis.com/v1beta/models/' + ($env.GEMINI_MODEL || 'gemini-2.5-flash-lite') + ':generateContent' }}",
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
-            {"name": "x-api-key", "value": "={{$env.ANTHROPIC_API_KEY}}"},
-            {"name": "anthropic-version", "value": "2023-06-01"},
+            {"name": "x-goog-api-key", "value": "={{$env.GEMINI_API_KEY}}"},
             {"name": "Content-Type", "value": "application/json"}
           ]
         },
         "sendBody": true,
         "contentType": "raw",
         "rawContentType": "application/json",
-        "body": "={{ JSON.stringify({ ...$json.request, model: $env.ANTHROPIC_MODEL || $json.request.model }) }}",
+        "body": "={{ JSON.stringify($json.request) }}",
         "options": {}
       },
       "id": "3fe2cdf9-c494-48d5-bce0-74a89de8fe66",
-      "name": "Claude Haiku Score Job",
+      "name": "Gemini Score Job",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
       "position": [520, 0]
     },
     {
       "parameters": {
-        "jsCode": "const r = $json;\nconst toolUse = (r.content ?? []).find(item => item.type === 'tool_use' && item.name === 'record_job_match');\nif (!toolUse?.input) throw new Error('Anthropic response did not contain record_job_match tool output');\nreturn [{ json: { ...toolUse.input, scored_at: new Date().toISOString(), model: r.model, usage: r.usage ?? {} } }];"
+        "jsCode": "const r = $json;\nconst parts = r.candidates?.[0]?.content?.parts ?? [];\nconst text = parts.map(p => p.text ?? '').join('').trim();\n\nif (!text) {\n  throw new Error(`Gemini response did not contain text. finishReason=${r.candidates?.[0]?.finishReason ?? 'unknown'}`);\n}\n\nlet result;\ntry {\n  result = JSON.parse(text);\n} catch (e) {\n  throw new Error(`Gemini returned invalid JSON: ${e.message}`);\n}\n\nreturn [{\n  json: {\n    ...result,\n    scored_at: new Date().toISOString(),\n    model: r.modelVersion ?? 'gemini',\n    usage: r.usageMetadata ?? {}\n  }\n}];"
       },
       "id": "f8250d24-03f9-4eb8-897a-345224ef7f33",
       "name": "Parse Score",
@@ -62,13 +61,13 @@
   ],
   "connections": {
     "Score Job Webhook": {"main": [[{"node": "Build Scoring Request", "type": "main", "index": 0}]]},
-    "Build Scoring Request": {"main": [[{"node": "Claude Haiku Score Job", "type": "main", "index": 0}]]},
-    "Claude Haiku Score Job": {"main": [[{"node": "Parse Score", "type": "main", "index": 0}]]}
+    "Build Scoring Request": {"main": [[{"node": "Gemini Score Job", "type": "main", "index": 0}]]},
+    "Gemini Score Job": {"main": [[{"node": "Parse Score", "type": "main", "index": 0}]]}
   },
   "pinData": {},
   "settings": {"executionOrder": "v1"},
   "active": false,
-  "versionId": "aa54a7a8-9a40-4e2e-a019-f04d6b46cb4b",
+  "versionId": "b9cc204e-3d4d-4da1-8b48-0d4fc8c48bb4",
   "meta": {"templateCredsSetupCompleted": false},
   "tags": []
 }
