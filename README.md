@@ -13,6 +13,8 @@ A lightweight personal job-search assistant for one candidate. V0 focuses on the
 
 Not included yet: LinkedIn automation, scraping, recruiter enrichment, automated applications, complex vector databases, or multi-agent orchestration.
 
+No real resume/CV is required for this V0. The included request uses synthetic sample data only.
+
 ## Architecture
 
 ```text
@@ -25,7 +27,7 @@ Resume/profile + preferences
        n8n workflow
             |
             v
-       OpenAI API
+ Anthropic Claude Haiku API
             |
             v
  score + explanation + verdict
@@ -35,6 +37,12 @@ Resume/profile + preferences
        v         v
  Google Sheet  Telegram digest
 ```
+
+## Model
+
+V0 defaults to `claude-haiku-4-5` through the Anthropic Messages API. The workflow forces Claude to return the assessment through a structured tool schema so the downstream n8n nodes receive predictable JSON.
+
+The model is configurable with `ANTHROPIC_MODEL` in `.env`.
 
 ## Quick start
 
@@ -50,11 +58,20 @@ Open http://localhost:5678 and create the local n8n owner account.
 
 ### 2. Configure environment
 
-Copy `.env.example` to `.env` and add your OpenAI API key.
+Copy `.env.example` to `.env` and add your Anthropic API key.
 
 ```bash
 cp .env.example .env
 ```
+
+Then edit `.env`:
+
+```text
+ANTHROPIC_API_KEY=your_real_key_here
+ANTHROPIC_MODEL=claude-haiku-4-5
+```
+
+`.env` is gitignored. Never put the real API key in `.env.example`, workflow JSON, README, or GitHub.
 
 Restart n8n after changing `.env`:
 
@@ -108,13 +125,29 @@ POST JSON like this to the webhook:
 }
 ```
 
-The response is structured JSON containing the match score, verdict, reasons, gaps, and red flags.
+The response is structured JSON containing the match score, verdict, reasons, gaps, red flags, model name, and Anthropic token usage.
+
+You can also test with the included sample:
+
+```bash
+curl -X POST 'YOUR_N8N_WEBHOOK_URL' \
+  -H 'Content-Type: application/json' \
+  --data @samples/request.json
+```
+
+## About free model APIs
+
+The workflow currently uses Anthropic because it is already configured for the project and is inexpensive at this scale. The architecture can later be adapted to Gemini or an Anthropic/OpenAI-compatible gateway without changing the candidate/job data model.
+
+For real CV/profile data, review each provider's data-use policy before switching to a free tier. Free developer tiers can have different privacy terms from paid API usage.
 
 ## Suggested V0 validation
 
-Before automating job discovery, give the workflow 20–30 real jobs your friend has never rated. Ask him to rate the top 10 independently.
+Before automating job discovery, give the workflow 20–30 real job descriptions your friend has never rated. Ask him to rate the top 10 independently.
 
 A good signal to continue is if roughly 8 of the agent's top 10 are jobs he genuinely considers relevant.
+
+Do not commit those job inputs or any future real resume to this repository; submit them to the running workflow at runtime.
 
 ## Next milestones
 
