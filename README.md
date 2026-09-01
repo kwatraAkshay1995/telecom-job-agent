@@ -27,7 +27,7 @@ Resume/profile + preferences
        n8n workflow
             |
             v
- Google Gemini API
+ Gemini Interactions API
             |
             v
  score + explanation + verdict
@@ -40,9 +40,7 @@ Resume/profile + preferences
 
 ## Model
 
-V0 defaults to `gemini-2.5-flash-lite` through the Gemini Developer API. It is a stable, fast model that supports structured JSON output and currently has free input/output token usage on Google's free developer tier.
-
-The workflow sends a JSON schema with every scoring request, so downstream n8n nodes receive a predictable object rather than free-form model text.
+V0 defaults to `gemini-3.5-flash-lite`, Google's stable cost-efficient model for high-volume automation. The workflow uses the Gemini Interactions API, which Google recommends for new development, and requests structured JSON output with a JSON Schema.
 
 The model is configurable with `GEMINI_MODEL` in `.env`.
 
@@ -72,7 +70,7 @@ Edit `.env`:
 
 ```text
 GEMINI_API_KEY=your_real_key_here
-GEMINI_MODEL=gemini-2.5-flash-lite
+GEMINI_MODEL=gemini-3.5-flash-lite
 ```
 
 `.env` is gitignored. Never put the real API key in `.env.example`, workflow JSON, README, or GitHub.
@@ -129,7 +127,7 @@ POST JSON like this to the webhook:
 }
 ```
 
-The response is structured JSON containing the match score, verdict, reasons, gaps, red flags, model version, and Gemini usage metadata.
+The response is structured JSON containing the match score, verdict, reasons, gaps, red flags, model, interaction ID, and Gemini usage metadata.
 
 You can also test with the included sample:
 
@@ -141,7 +139,7 @@ curl -X POST 'YOUR_N8N_WEBHOOK_URL' \
 
 ## Why Gemini for V0
 
-For this one-person prototype, Gemini 2.5 Flash-Lite keeps model inference cost at zero while we validate whether the ranking logic is actually useful. The candidate/job data model is provider-independent, so switching models later does not require redesigning the application.
+For this one-person prototype, Gemini 3.5 Flash-Lite currently has free input/output usage on Google's developer free tier, so we can validate ranking quality before paying for model inference.
 
 Do not commit real job inputs, personal profile data, or any future real resume to this repository; submit them to the running workflow at runtime.
 
