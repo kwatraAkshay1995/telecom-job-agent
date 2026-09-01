@@ -17,7 +17,7 @@
     },
     {
       "parameters": {
-        "jsCode": "const body = $json.body ?? $json;\n\nfor (const required of ['candidate_profile', 'job']) {\n  if (!body[required]) throw new Error(`Missing required field: ${required}`);\n}\n\nconst profile = body.candidate_profile;\nconst positive = body.positive_examples ?? [];\nconst negative = body.negative_examples ?? [];\nconst job = body.job;\n\nconst prompt = `You are a career matching engine for one candidate.\n\nSCORING PRIORITY\n1. Explicit negative examples and avoid preferences.\n2. Explicit positive examples and preferred roles.\n3. Candidate skills and experience.\n4. Location and seniority fit.\n5. Transferable skills.\n\nDo not inflate a score merely because a job is in telecom.\n\nScore meaning:\n90-100 exceptional fit\n80-89 strong fit\n70-79 reasonable fit\n55-69 borderline\nbelow 55 poor fit\n\nCandidate profile:\n${JSON.stringify(profile, null, 2)}\n\nJobs the candidate likes:\n${JSON.stringify(positive, null, 2)}\n\nJobs the candidate dislikes:\n${JSON.stringify(negative, null, 2)}\n\nJob to evaluate:\n${JSON.stringify(job, null, 2)}\n\nReturn only the structured assessment requested by the response schema.`;\n\nconst schema = {\n  type: 'object',\n  additionalProperties: false,\n  properties: {\n    score: { type: 'integer', minimum: 0, maximum: 100 },\n    verdict: { type: 'string', enum: ['EXCELLENT','STRONG','POSSIBLE','WEAK','REJECT'] },\n    matching_reasons: { type: 'array', items: { type: 'string' }, maxItems: 5 },\n    gaps: { type: 'array', items: { type: 'string' } },\n    red_flags: { type: 'array', items: { type: 'string' } },\n    inferred_role_family: { type: 'string' },\n    recommended_action: { type: 'string', enum: ['APPLY','REVIEW','SKIP'] }\n  },\n  required: ['score','verdict','matching_reasons','gaps','red_flags','inferred_role_family','recommended_action']\n};\n\nconst request = {\n  contents: [{\n    role: 'user',\n    parts: [{ text: prompt }]\n  }],\n  generationConfig: {\n    temperature: 0.2,\n    maxOutputTokens: 1200,\n    responseMimeType: 'application/json',\n    responseJsonSchema: schema\n  }\n};\n\nreturn [{ json: { request, source_job: job } }];"
+        "jsCode": "const body = $json.body ?? $json;\n\nfor (const required of ['candidate_profile', 'job']) {\n  if (!body[required]) throw new Error(`Missing required field: ${required}`);\n}\n\nconst profile = body.candidate_profile;\nconst positive = body.positive_examples ?? [];\nconst negative = body.negative_examples ?? [];\nconst job = body.job;\n\nconst prompt = `You are a career matching engine for one candidate.\n\nSCORING PRIORITY\n1. Explicit negative examples and avoid preferences.\n2. Explicit positive examples and preferred roles.\n3. Candidate skills and experience.\n4. Location and seniority fit.\n5. Transferable skills.\n\nDo not inflate a score merely because a job is in telecom.\n\nScore meaning:\n90-100 exceptional fit\n80-89 strong fit\n70-79 reasonable fit\n55-69 borderline\nbelow 55 poor fit\n\nCandidate profile:\n${JSON.stringify(profile, null, 2)}\n\nJobs the candidate likes:\n${JSON.stringify(positive, null, 2)}\n\nJobs the candidate dislikes:\n${JSON.stringify(negative, null, 2)}\n\nJob to evaluate:\n${JSON.stringify(job, null, 2)}\n\nReturn only the structured assessment requested by the response schema.`;\n\nconst schema = {\n  type: 'object',\n  additionalProperties: false,\n  properties: {\n    score: { type: 'integer', minimum: 0, maximum: 100 },\n    verdict: { type: 'string', enum: ['EXCELLENT','STRONG','POSSIBLE','WEAK','REJECT'] },\n    matching_reasons: { type: 'array', items: { type: 'string' }, maxItems: 5 },\n    gaps: { type: 'array', items: { type: 'string' } },\n    red_flags: { type: 'array', items: { type: 'string' } },\n    inferred_role_family: { type: 'string' },\n    recommended_action: { type: 'string', enum: ['APPLY','REVIEW','SKIP'] }\n  },\n  required: ['score','verdict','matching_reasons','gaps','red_flags','inferred_role_family','recommended_action']\n};\n\nconst request = {\n  input: prompt,\n  store: false,\n  generation_config: {\n    max_output_tokens: 1200\n  },\n  response_format: [{\n    type: 'text',\n    mime_type: 'application/json',\n    schema\n  }]\n};\n\nreturn [{ json: { request, source_job: job } }];"
       },
       "id": "f5ea8704-273a-4110-9d70-2dca576fdd5f",
       "name": "Build Scoring Request",
@@ -28,7 +28,7 @@
     {
       "parameters": {
         "method": "POST",
-        "url": "={{ 'https://generativelanguage.googleapis.com/v1beta/models/' + ($env.GEMINI_MODEL || 'gemini-2.5-flash-lite') + ':generateContent' }}",
+        "url": "https://generativelanguage.googleapis.com/v1beta/interactions",
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
@@ -39,7 +39,7 @@
         "sendBody": true,
         "contentType": "raw",
         "rawContentType": "application/json",
-        "body": "={{ JSON.stringify($json.request) }}",
+        "body": "={{ JSON.stringify({ ...$json.request, model: $env.GEMINI_MODEL || 'gemini-3.5-flash-lite' }) }}",
         "options": {}
       },
       "id": "3fe2cdf9-c494-48d5-bce0-74a89de8fe66",
@@ -50,7 +50,7 @@
     },
     {
       "parameters": {
-        "jsCode": "const r = $json;\nconst parts = r.candidates?.[0]?.content?.parts ?? [];\nconst text = parts.map(p => p.text ?? '').join('').trim();\n\nif (!text) {\n  throw new Error(`Gemini response did not contain text. finishReason=${r.candidates?.[0]?.finishReason ?? 'unknown'}`);\n}\n\nlet result;\ntry {\n  result = JSON.parse(text);\n} catch (e) {\n  throw new Error(`Gemini returned invalid JSON: ${e.message}`);\n}\n\nreturn [{\n  json: {\n    ...result,\n    scored_at: new Date().toISOString(),\n    model: r.modelVersion ?? 'gemini',\n    usage: r.usageMetadata ?? {}\n  }\n}];"
+        "jsCode": "const r = $json;\n\nconst modelOutputs = (r.steps ?? []).filter(step => step.type === 'model_output');\nconst lastOutput = modelOutputs[modelOutputs.length - 1];\nconst text = (lastOutput?.content ?? [])\n  .filter(item => item.type === 'text')\n  .map(item => item.text ?? '')\n  .join('')\n  .trim();\n\nif (!text) {\n  throw new Error(`Gemini interaction did not contain model text. status=${r.status ?? 'unknown'}`);\n}\n\nlet result;\ntry {\n  result = JSON.parse(text);\n} catch (e) {\n  throw new Error(`Gemini returned invalid JSON: ${e.message}`);\n}\n\nreturn [{\n  json: {\n    ...result,\n    scored_at: new Date().toISOString(),\n    model: r.model ?? 'gemini',\n    interaction_id: r.id ?? null,\n    usage: r.usage ?? {}\n  }\n}];"
       },
       "id": "f8250d24-03f9-4eb8-897a-345224ef7f33",
       "name": "Parse Score",
@@ -67,7 +67,7 @@
   "pinData": {},
   "settings": {"executionOrder": "v1"},
   "active": false,
-  "versionId": "b9cc204e-3d4d-4da1-8b48-0d4fc8c48bb4",
+  "versionId": "54c456bc-b923-40ed-a12b-570d2db0d154",
   "meta": {"templateCredsSetupCompleted": false},
   "tags": []
 }
